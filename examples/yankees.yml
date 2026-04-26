@@ -1,0 +1,8 @@
+# New York Yankees
+- !include widget.yml
+  parameters:
+    teamId: "147"
+    teamAbbr: "NYY"
+    teamName: "New York Yankees"
+    teamCode: "nyy"
+    season: "2026"

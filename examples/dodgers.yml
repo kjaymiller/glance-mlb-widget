@@ -1,0 +1,8 @@
+# Los Angeles Dodgers
+- !include widget.yml
+  parameters:
+    teamId: "119"
+    teamAbbr: "LAD"
+    teamName: "Los Angeles Dodgers"
+    teamCode: "lad"
+    season: "2026"

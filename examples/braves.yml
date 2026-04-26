@@ -1,0 +1,8 @@
+# Atlanta Braves — paste into your Glance page or use via $include.
+- !include widget.yml
+  parameters:
+    teamId: "144"
+    teamAbbr: "ATL"
+    teamName: "Atlanta Braves"
+    teamCode: "atl"
+    season: "2026"

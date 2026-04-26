@@ -1,0 +1,182 @@
+# MLB 7-day team schedule widget for Glance.
+#
+# Parameters (all required):
+#   teamId    — MLB StatsAPI team ID (e.g. 144 = Atlanta Braves). See README.
+#   teamAbbr  — 3-letter abbreviation used by MLB StatsAPI (e.g. "ATL").
+#               Used to detect home vs. away in the template.
+#   teamName  — Display name shown next to the logo (e.g. "Atlanta Braves").
+#   teamCode  — ESPN CDN code for your team's logo (lowercase). Mostly the
+#               same as teamAbbr lowercased; known quirk: Angels = "laa".
+#   season    — 4-digit year. Bump every January.
+#
+# Glance applies ${var} substitution to both `url` and `template` before the
+# Go-template engine runs, which is how the parameters reach the template.
+#
+# Opponent logos use MLB StatsAPI's team.fileCode field (e.g. "atl", "nyy").
+# StatsAPI returns "ana" for the Angels but ESPN's CDN expects "laa", so the
+# template rewrites that one case.
+#
+# Glance's custom-api template funcset has no iteration helpers (no until/seq/
+# list), so the 7 cells of the calendar grid are unrolled by hand. The per-game
+# render is factored into a `define "game"` block to keep it DRY.
+- type: custom-api
+  title: ${teamName} — 7 day view
+  cache: 5m
+  parameters:
+    teamId: ""
+    teamAbbr: ""
+    teamName: ""
+    teamCode: ""
+    season: ""
+  url: https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=${teamId}&season=${season}&hydrate=linescore,team
+  template: |
+    {{- define "espnLogo" -}}
+      {{- $code := . -}}
+      {{- if eq $code "ana" }}laa{{ else }}{{ $code }}{{ end -}}
+    {{- end -}}
+
+    {{- define "game" -}}
+      {{- $status := .String "status.detailedState" -}}
+      {{- $awayAbbr := .String "teams.away.team.abbreviation" -}}
+      {{- $homeAbbr := .String "teams.home.team.abbreviation" -}}
+      {{- $awayCode := .String "teams.away.team.fileCode" -}}
+      {{- $homeCode := .String "teams.home.team.fileCode" -}}
+      {{- $awayScore := .Int "teams.away.score" -}}
+      {{- $homeScore := .Int "teams.home.score" -}}
+      {{- $pk := .Int "gamePk" -}}
+      {{- $isHome := eq $homeAbbr "${teamAbbr}" -}}
+      {{- $oppAbbr := $awayAbbr }}{{ $oppCode := $awayCode }}{{ $loc := "vs" -}}
+      {{- if not $isHome }}{{ $oppAbbr = $homeAbbr }}{{ $oppCode = $homeCode }}{{ $loc = "@" }}{{ end -}}
+      <div style="margin-top:.3rem;display:flex;align-items:center;justify-content:center;gap:.2rem;font-size:.8em">
+        <small>{{ $loc }}</small>
+        <img src="https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/{{ template "espnLogo" $oppCode }}.png&h=20&w=20"
+             alt="{{ $oppAbbr }}" referrerpolicy="no-referrer" style="height:18px;width:auto" />
+      </div>
+      <div>
+        <a href="https://www.mlb.com/gameday/{{ $pk }}" target="_blank" rel="noopener" style="text-decoration:none">
+        {{- if eq $status "Final" -}}
+          {{- $us := $homeScore }}{{ $them := $awayScore -}}
+          {{- if not $isHome }}{{ $us = $awayScore }}{{ $them = $homeScore }}{{ end -}}
+          {{- if gt $us $them -}}
+            <strong class="color-positive">W</strong> <small>{{ $us }}-{{ $them }}</small>
+          {{- else -}}
+            <strong class="color-negative">L</strong> <small>{{ $us }}-{{ $them }}</small>
+          {{- end -}}
+        {{- else if eq $status "In Progress" -}}
+          <strong class="color-primary">LIVE</strong>
+          <div><small class="color-primary">{{ .String "linescore.currentInningOrdinal" }}</small></div>
+          <div><small>{{ if $isHome }}{{ $homeScore }}-{{ $awayScore }}{{ else }}{{ $awayScore }}-{{ $homeScore }}{{ end }}</small></div>
+        {{- else -}}
+          <small>{{ .String "gameDate" | parseTime "rfc3339" | formatTime "3:04 PM" }}</small>
+        {{- end -}}
+        </a>
+      </div>
+      {{- if eq $status "Final" }}
+        <div><small><a href="https://www.youtube.com/results?search_query=${teamName}+highlights+{{ .String "officialDate" }}" target="_blank" rel="noopener">▶ highlights</a></small></div>
+      {{- end -}}
+    {{- end -}}
+
+    {{- $today := now | formatTime "2006-01-02" -}}
+    {{- $dates := .JSON.Array "dates" -}}
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+      <img src="https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/${teamCode}.png&h=64&w=64"
+           alt="${teamName}" referrerpolicy="no-referrer" style="height:32px;width:auto" />
+      <small style="opacity:.7">${teamName} · 7 day view</small>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.4rem;text-align:center">
+
+    {{- /* 7 cells, offsets -72h..+72h, unrolled because the funcset has no
+           iteration helpers. Each cell scans $dates for a date match and
+           invokes the "game" template per matching game. */ -}}
+
+    {{- /* CELL 1: -72h */ -}}
+    {{- $d := offsetNow "-72h" | formatTime "2006-01-02" -}}
+    {{- $dow := offsetNow "-72h" | formatTime "Mon" -}}
+    {{- $md := offsetNow "-72h" | formatTime "1/2" -}}
+    {{- $isToday := eq $d $today -}}
+    <div style="border:1px solid var(--color-separator);border-radius:.4rem;padding:.4rem .25rem{{ if $isToday }};border-color:var(--color-primary){{ end }}">
+      <div><strong{{ if $isToday }} class="color-primary"{{ end }}>{{ $dow }}</strong></div>
+      <div><small>{{ $md }}</small></div>
+      {{- $found := false -}}
+      {{- range $dates }}{{ if eq (.String "date") $d }}{{ range .Array "games" }}{{ $found = true }}{{ template "game" . }}{{ end }}{{ end }}{{ end -}}
+      {{- if not $found }}<div style="margin-top:.3rem;opacity:.35">—</div>{{ end -}}
+    </div>
+
+    {{- /* CELL 2: -48h */ -}}
+    {{- $d = offsetNow "-48h" | formatTime "2006-01-02" -}}
+    {{- $dow = offsetNow "-48h" | formatTime "Mon" -}}
+    {{- $md = offsetNow "-48h" | formatTime "1/2" -}}
+    {{- $isToday = eq $d $today -}}
+    <div style="border:1px solid var(--color-separator);border-radius:.4rem;padding:.4rem .25rem{{ if $isToday }};border-color:var(--color-primary){{ end }}">
+      <div><strong{{ if $isToday }} class="color-primary"{{ end }}>{{ $dow }}</strong></div>
+      <div><small>{{ $md }}</small></div>
+      {{- $found = false -}}
+      {{- range $dates }}{{ if eq (.String "date") $d }}{{ range .Array "games" }}{{ $found = true }}{{ template "game" . }}{{ end }}{{ end }}{{ end -}}
+      {{- if not $found }}<div style="margin-top:.3rem;opacity:.35">—</div>{{ end -}}
+    </div>
+
+    {{- /* CELL 3: -24h */ -}}
+    {{- $d = offsetNow "-24h" | formatTime "2006-01-02" -}}
+    {{- $dow = offsetNow "-24h" | formatTime "Mon" -}}
+    {{- $md = offsetNow "-24h" | formatTime "1/2" -}}
+    {{- $isToday = eq $d $today -}}
+    <div style="border:1px solid var(--color-separator);border-radius:.4rem;padding:.4rem .25rem{{ if $isToday }};border-color:var(--color-primary){{ end }}">
+      <div><strong{{ if $isToday }} class="color-primary"{{ end }}>{{ $dow }}</strong></div>
+      <div><small>{{ $md }}</small></div>
+      {{- $found = false -}}
+      {{- range $dates }}{{ if eq (.String "date") $d }}{{ range .Array "games" }}{{ $found = true }}{{ template "game" . }}{{ end }}{{ end }}{{ end -}}
+      {{- if not $found }}<div style="margin-top:.3rem;opacity:.35">—</div>{{ end -}}
+    </div>
+
+    {{- /* CELL 4: today */ -}}
+    {{- $d = now | formatTime "2006-01-02" -}}
+    {{- $dow = now | formatTime "Mon" -}}
+    {{- $md = now | formatTime "1/2" -}}
+    <div style="border:1px solid var(--color-primary);border-radius:.4rem;padding:.4rem .25rem">
+      <div><strong class="color-primary">{{ $dow }}</strong></div>
+      <div><small>{{ $md }}</small></div>
+      {{- $found = false -}}
+      {{- range $dates }}{{ if eq (.String "date") $d }}{{ range .Array "games" }}{{ $found = true }}{{ template "game" . }}{{ end }}{{ end }}{{ end -}}
+      {{- if not $found }}<div style="margin-top:.3rem;opacity:.35">—</div>{{ end -}}
+    </div>
+
+    {{- /* CELL 5: +24h */ -}}
+    {{- $d = offsetNow "24h" | formatTime "2006-01-02" -}}
+    {{- $dow = offsetNow "24h" | formatTime "Mon" -}}
+    {{- $md = offsetNow "24h" | formatTime "1/2" -}}
+    {{- $isToday = eq $d $today -}}
+    <div style="border:1px solid var(--color-separator);border-radius:.4rem;padding:.4rem .25rem{{ if $isToday }};border-color:var(--color-primary){{ end }}">
+      <div><strong{{ if $isToday }} class="color-primary"{{ end }}>{{ $dow }}</strong></div>
+      <div><small>{{ $md }}</small></div>
+      {{- $found = false -}}
+      {{- range $dates }}{{ if eq (.String "date") $d }}{{ range .Array "games" }}{{ $found = true }}{{ template "game" . }}{{ end }}{{ end }}{{ end -}}
+      {{- if not $found }}<div style="margin-top:.3rem;opacity:.35">—</div>{{ end -}}
+    </div>
+
+    {{- /* CELL 6: +48h */ -}}
+    {{- $d = offsetNow "48h" | formatTime "2006-01-02" -}}
+    {{- $dow = offsetNow "48h" | formatTime "Mon" -}}
+    {{- $md = offsetNow "48h" | formatTime "1/2" -}}
+    {{- $isToday = eq $d $today -}}
+    <div style="border:1px solid var(--color-separator);border-radius:.4rem;padding:.4rem .25rem{{ if $isToday }};border-color:var(--color-primary){{ end }}">
+      <div><strong{{ if $isToday }} class="color-primary"{{ end }}>{{ $dow }}</strong></div>
+      <div><small>{{ $md }}</small></div>
+      {{- $found = false -}}
+      {{- range $dates }}{{ if eq (.String "date") $d }}{{ range .Array "games" }}{{ $found = true }}{{ template "game" . }}{{ end }}{{ end }}{{ end -}}
+      {{- if not $found }}<div style="margin-top:.3rem;opacity:.35">—</div>{{ end -}}
+    </div>
+
+    {{- /* CELL 7: +72h */ -}}
+    {{- $d = offsetNow "72h" | formatTime "2006-01-02" -}}
+    {{- $dow = offsetNow "72h" | formatTime "Mon" -}}
+    {{- $md = offsetNow "72h" | formatTime "1/2" -}}
+    {{- $isToday = eq $d $today -}}
+    <div style="border:1px solid var(--color-separator);border-radius:.4rem;padding:.4rem .25rem{{ if $isToday }};border-color:var(--color-primary){{ end }}">
+      <div><strong{{ if $isToday }} class="color-primary"{{ end }}>{{ $dow }}</strong></div>
+      <div><small>{{ $md }}</small></div>
+      {{- $found = false -}}
+      {{- range $dates }}{{ if eq (.String "date") $d }}{{ range .Array "games" }}{{ $found = true }}{{ template "game" . }}{{ end }}{{ end }}{{ end -}}
+      {{- if not $found }}<div style="margin-top:.3rem;opacity:.35">—</div>{{ end -}}
+    </div>
+
+    </div>

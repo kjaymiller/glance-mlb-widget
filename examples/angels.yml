@@ -1,0 +1,11 @@
+# Los Angeles Angels — note teamCode is "laa", not "ana".
+# MLB's StatsAPI returns "ana" in fileCode, but ESPN's CDN expects "laa".
+# The template handles that for opponent logos automatically; for your own
+# team logo (this widget's header) you must pass "laa".
+- !include widget.yml
+  parameters:
+    teamId: "108"
+    teamAbbr: "LAA"
+    teamName: "Los Angeles Angels"
+    teamCode: "laa"
+    season: "2026"
