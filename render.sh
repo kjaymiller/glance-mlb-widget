@@ -35,7 +35,7 @@ EOF
 sed -e "s/__TEAM_ABBR__/${teamAbbr}/g" \
     -e "s/__TEAM_NAME__/${teamName}/g" \
     -e "s/__TEAM_CODE__/${teamCode}/g" \
-    -e "s/teamId: \"\"/teamId: \"${teamId}\"/" \
+    -e "s/teamId: \"\".*/teamId: \"${teamId}\"/" \
     -e "s/season: \"2026\"/season: \"${season}\"/" \
     "$here/widget.yml" \
   | sed -n '/^- type:/,$p'

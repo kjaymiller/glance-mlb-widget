@@ -1,10 +1,13 @@
 # MLB 7-day team schedule widget for Glance.
 #
 # This file is a TEMPLATE. To use it for a specific team you must replace
-# three tokens by find/replace, because Glance's `parameters:` field only
-# substitutes into the `url` field — not into the `template` body.
-# `teamId` and `season` go through `parameters:` (they're in the URL);
-# everything else has to be hardcoded.
+# three tokens by find/replace, because Glance's `parameters:` field is a
+# query-string appender (see `queryParametersField.toQueryString` in the
+# Glance source) — it serializes parameters and tacks them onto the URL.
+# It does NOT do `${var}` substitution into either the `url` or the
+# `template`. So `teamId` and `season` work as parameters (they end up in
+# the request URL), but anything referenced inside the template body has
+# to be hardcoded.
 #
 # Tokens to replace:
 #   __TEAM_ABBR__  — 3-letter abbreviation as MLB StatsAPI returns it
@@ -30,10 +33,10 @@
 - type: custom-api
   title: __TEAM_NAME__ — 7 day view
   cache: 5m
+  url: https://statsapi.mlb.com/api/v1/schedule?sportId=1&hydrate=linescore,team
   parameters:
     teamId: ""        # e.g. "144" for the Braves
     season: "2026"
-  url: https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=${teamId}&season=${season}&hydrate=linescore,team
   template: |
     {{- define "espnLogo" -}}
       {{- $code := . -}}

@@ -33,7 +33,7 @@ Or by hand: copy `widget.yml`, find/replace `__TEAM_ABBR__`, `__TEAM_NAME__`, `_
 
 ## Why find/replace and not parameters?
 
-Glance's `parameters:` field is real, but it only substitutes `${var}` into the **`url`** field — not into the `template` body. So `teamId` and `season` (which live in the URL) are real parameters, but `teamAbbr`, `teamName`, and `teamCode` (which are referenced inside the template) have to be hardcoded. Hence the find/replace workflow and the `examples/` directory.
+Glance's `parameters:` field is a **query-string appender**, not a substitutor. It serializes the keys/values you give it and tacks them onto the request URL — there's no `${var}` interpolation, into either the URL or the template body. So `teamId` and `season` work as real parameters (they ride along on the request as `?teamId=…&season=…`), but `teamAbbr`, `teamName`, and `teamCode` are referenced inside the template body and have to be hardcoded. Hence the find/replace workflow and the `examples/` directory.
 
 ## Team IDs
 

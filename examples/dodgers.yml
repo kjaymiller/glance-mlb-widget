@@ -6,10 +6,10 @@
 - type: custom-api
   title: Los Angeles Dodgers — 7 day view
   cache: 5m
+  url: https://statsapi.mlb.com/api/v1/schedule?sportId=1&hydrate=linescore,team
   parameters:
-    teamId: "119"        # e.g. "144" for the Braves
+    teamId: "119"
     season: "2026"
-  url: https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=${teamId}&season=${season}&hydrate=linescore,team
   template: |
     {{- define "espnLogo" -}}
       {{- $code := . -}}
