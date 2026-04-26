@@ -1,33 +1,38 @@
 # MLB 7-day team schedule widget for Glance.
 #
-# Parameters (all required):
-#   teamId    — MLB StatsAPI team ID (e.g. 144 = Atlanta Braves). See README.
-#   teamAbbr  — 3-letter abbreviation used by MLB StatsAPI (e.g. "ATL").
-#               Used to detect home vs. away in the template.
-#   teamName  — Display name shown next to the logo (e.g. "Atlanta Braves").
-#   teamCode  — ESPN CDN code for your team's logo (lowercase). Mostly the
-#               same as teamAbbr lowercased; known quirk: Angels = "laa".
-#   season    — 4-digit year. Bump every January.
+# This file is a TEMPLATE. To use it for a specific team you must replace
+# three tokens by find/replace, because Glance's `parameters:` field only
+# substitutes into the `url` field — not into the `template` body.
+# `teamId` and `season` go through `parameters:` (they're in the URL);
+# everything else has to be hardcoded.
 #
-# Glance applies ${var} substitution to both `url` and `template` before the
-# Go-template engine runs, which is how the parameters reach the template.
+# Tokens to replace:
+#   __TEAM_ABBR__  — 3-letter abbreviation as MLB StatsAPI returns it
+#                    (e.g. "ATL"). Used to detect home vs. away.
+#   __TEAM_NAME__  — Display name (e.g. "Atlanta Braves"). Appears next
+#                    to the logo and in the YouTube highlights search.
+#   __TEAM_CODE__  — ESPN CDN logo code, lowercase. Usually __TEAM_ABBR__
+#                    lowercased; the only known quirk is Angels = "laa".
 #
-# Opponent logos use MLB StatsAPI's team.fileCode field (e.g. "atl", "nyy").
-# StatsAPI returns "ana" for the Angels but ESPN's CDN expects "laa", so the
-# template rewrites that one case.
+# Then set teamId and season in the `parameters:` block.
 #
-# Glance's custom-api template funcset has no iteration helpers (no until/seq/
-# list), so the 7 cells of the calendar grid are unrolled by hand. The per-game
-# render is factored into a `define "game"` block to keep it DRY.
+# See README.md for a full team-ID/abbr/code lookup table, or grab a
+# pre-rendered file from examples/.
+#
+# Notes:
+#   - Opponent logos come from MLB StatsAPI's team.fileCode field. StatsAPI
+#     returns "ana" for the Angels but ESPN's CDN expects "laa", so the
+#     template rewrites that one case for opponent logos automatically.
+#   - Glance's custom-api template funcset has no iteration helpers
+#     (no until/seq/list), so the 7 cells of the grid are unrolled by hand.
+#     The per-game render is factored into a `define "game"` block.
+#   - Bump season every January.
 - type: custom-api
-  title: ${teamName} — 7 day view
+  title: __TEAM_NAME__ — 7 day view
   cache: 5m
   parameters:
-    teamId: ""
-    teamAbbr: ""
-    teamName: ""
-    teamCode: ""
-    season: ""
+    teamId: ""        # e.g. "144" for the Braves
+    season: "2026"
   url: https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=${teamId}&season=${season}&hydrate=linescore,team
   template: |
     {{- define "espnLogo" -}}
@@ -44,7 +49,7 @@
       {{- $awayScore := .Int "teams.away.score" -}}
       {{- $homeScore := .Int "teams.home.score" -}}
       {{- $pk := .Int "gamePk" -}}
-      {{- $isHome := eq $homeAbbr "${teamAbbr}" -}}
+      {{- $isHome := eq $homeAbbr "__TEAM_ABBR__" -}}
       {{- $oppAbbr := $awayAbbr }}{{ $oppCode := $awayCode }}{{ $loc := "vs" -}}
       {{- if not $isHome }}{{ $oppAbbr = $homeAbbr }}{{ $oppCode = $homeCode }}{{ $loc = "@" }}{{ end -}}
       <div style="margin-top:.3rem;display:flex;align-items:center;justify-content:center;gap:.2rem;font-size:.8em">
@@ -72,16 +77,16 @@
         </a>
       </div>
       {{- if eq $status "Final" }}
-        <div><small><a href="https://www.youtube.com/results?search_query=${teamName}+highlights+{{ .String "officialDate" }}" target="_blank" rel="noopener">▶ highlights</a></small></div>
+        <div><small><a href="https://www.youtube.com/results?search_query=__TEAM_NAME__+highlights+{{ .String "officialDate" }}" target="_blank" rel="noopener">▶ highlights</a></small></div>
       {{- end -}}
     {{- end -}}
 
     {{- $today := now | formatTime "2006-01-02" -}}
     {{- $dates := .JSON.Array "dates" -}}
     <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
-      <img src="https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/${teamCode}.png&h=64&w=64"
-           alt="${teamName}" referrerpolicy="no-referrer" style="height:32px;width:auto" />
-      <small style="opacity:.7">${teamName} · 7 day view</small>
+      <img src="https://a.espncdn.com/combiner/i?img=/i/teamlogos/mlb/500/__TEAM_CODE__.png&h=64&w=64"
+           alt="__TEAM_NAME__" referrerpolicy="no-referrer" style="height:32px;width:auto" />
+      <small style="opacity:.7">__TEAM_NAME__ · 7 day view</small>
     </div>
     <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.4rem;text-align:center">
 

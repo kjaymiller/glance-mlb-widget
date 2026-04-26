@@ -14,34 +14,28 @@ Built on the public [MLB StatsAPI](https://statsapi.mlb.com/) and [ESPN's logo C
 
 ## Install
 
-Drop `widget.yml` into your Glance config — either reference it via `$include` or paste it inline. Fill in the five parameters for your team:
+The fastest path: grab a **pre-rendered file from `examples/`** matching your team and drop it into your Glance widgets directory.
 
-```yaml
-# in your page's widgets list:
-- !include /path/to/widget.yml
-  parameters:
-    teamId: "144"
-    teamAbbr: "ATL"
-    teamName: "Atlanta Braves"
-    teamCode: "atl"
-    season: "2026"
+```bash
+curl -O https://raw.githubusercontent.com/kjaymiller/glance-mlb-widget/main/examples/braves.yml
+# then $include it from your page in glance.yml
 ```
 
-Or paste the widget body directly into your page and edit the `parameters:` block at the top.
+If your team isn't in `examples/`, render one with `render.sh`:
 
-See `examples/` for ready-to-use snippets for a few teams.
+```bash
+./render.sh <teamId> <teamAbbr> "<teamName>" <teamCode> [season] > my-team.yml
+# e.g.
+./render.sh 142 MIN "Minnesota Twins" min 2026 > twins.yml
+```
 
-## Parameters
+Or by hand: copy `widget.yml`, find/replace `__TEAM_ABBR__`, `__TEAM_NAME__`, `__TEAM_CODE__` with your values, then set `teamId` and `season` in the `parameters:` block at the top.
 
-| Name | What it is | Example |
-| --- | --- | --- |
-| `teamId` | MLB StatsAPI numeric team ID | `144` (Braves) |
-| `teamAbbr` | 3-letter abbreviation as MLB StatsAPI returns it | `ATL` |
-| `teamName` | Display name shown next to the logo and used in the YouTube highlights search | `Atlanta Braves` |
-| `teamCode` | ESPN CDN logo code (lowercase). Usually `teamAbbr` lowercased; **Angels = `laa`** | `atl` |
-| `season` | 4-digit year. Bump every January. | `2026` |
+## Why find/replace and not parameters?
 
-### Team IDs
+Glance's `parameters:` field is real, but it only substitutes `${var}` into the **`url`** field — not into the `template` body. So `teamId` and `season` (which live in the URL) are real parameters, but `teamAbbr`, `teamName`, and `teamCode` (which are referenced inside the template) have to be hardcoded. Hence the find/replace workflow and the `examples/` directory.
+
+## Team IDs
 
 | Team | `teamId` | `teamAbbr` | `teamCode` |
 | --- | --- | --- | --- |
@@ -76,13 +70,13 @@ See `examples/` for ready-to-use snippets for a few teams.
 | Toronto Blue Jays | 141 | TOR | tor |
 | Washington Nationals | 120 | WSH | wsh |
 
+`teamCode` is the ESPN CDN code for that team's logo. It's `teamAbbr` lowercased for every team except the Angels (MLB returns `ana` in `fileCode`, but ESPN expects `laa` — the template handles this for opponent logos automatically; you only need to know the quirk when filling in your *own* team's code).
+
 ## How it works
 
 - One API call to `/api/v1/schedule?teamId=...&season=...` returns the team's full season (~190 dates, small payload).
 - The template projects a 7-day window onto a calendar grid.
-- Glance applies `${var}` substitution to both the `url` and `template` fields before the Go-template engine runs — that's how parameters reach the template body.
 - Glance's custom-api template funcset has no iteration helpers (no `until` / `seq` / sprig), so the seven cells of the grid are unrolled by hand. The per-game render is factored into a `define "game"` block.
-- The Angels are `ana` in MLB's `fileCode` field but `laa` on ESPN's CDN, so the template rewrites that one case for opponent logos.
 
 ## Caveats
 
